@@ -1,0 +1,8 @@
+apiVersion: datafoundry.io/v1
+kind: ServiceBroker
+metadata:
+  name: Mysql
+spec:
+  password: test
+  url: http://localhost:9000
+  username: test
