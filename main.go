@@ -103,6 +103,8 @@ func (c *rebootController) handler(obj interface{}) {
 
 	pod := obj.(*v1.Pod)
 	glog.V(4).Infof("Pod: %s, status: %v, namespace: %s", pod.Name, podStatus(pod), pod.Namespace)
+	p, err := c.client.CoreV1().RESTClient().Get().Resource("pods").Namespace("user001").Do().Get()
+	fmt.Println("###%v,%v", p, err)
 }
 
 func podStatus(pod *v1.Pod) string {
