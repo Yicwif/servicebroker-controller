@@ -9,6 +9,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/util/wait"
 	"k8s.io/client-go/pkg/watch"
@@ -64,16 +65,24 @@ func newRebootController(client kubernetes.Interface) *rebootController {
 				// This is so we can determine the total count of "unavailable" nodes.
 				// However, this could also be implemented using multiple informers (or better, shared-informers)
 				// return client.Core().Pods().List(lo)
-				return client.Core().Pods("").List(lo)
+
+				// return client.Core().Pods("").List(lo)
+
+				// return client.CoreV1().RESTClient().Get().Resource("thirdpartyresources").Do().Get()
+				return client.Extensions().ThirdPartyResources().List(lo)
+
 			},
 			WatchFunc: func(alo api.ListOptions) (watch.Interface, error) {
 				var lo v1.ListOptions
 				v1.Convert_api_ListOptions_To_v1_ListOptions(&alo, &lo, nil)
-				return client.Core().Pods("").Watch(lo)
+				// return client.Core().Pods("").Watch(lo)
+				// return client.CoreV1().RESTClient().Get().Resource("thirdpartyresources").Watch()
+				return client.Extensions().ThirdPartyResources().Watch(lo)
 			},
 		},
 		// The types of objects this informer will return
-		&v1.Pod{},
+		// &v1.Pod{},
+		&v1beta1.ThirdPartyResource{},
 		// The resync period of this object. This will force a re-queue of all cached objects at this interval.
 		// Every object will trigger the `Updatefunc` even if there have been no actual updates triggered.
 		// In some cases you can set this to a very high interval - as you can assume you will see periodic updates in normal operation.
@@ -101,9 +110,11 @@ func (c *rebootController) handler(obj interface{}) {
 	//   A good example of this pattern is shown in: https://github.com/kubernetes/community/blob/master/contributors/devel/controllers.md
 	//   We could also protect against operating against a partial cache by not starting processing until cached synced.
 
-	pod := obj.(*v1.Pod)
-	glog.V(4).Infof("Pod: %s, status: %v, namespace: %s", pod.Name, podStatus(pod), pod.Namespace)
-	p, err := c.client.CoreV1().RESTClient().Get().Resource("pods").Namespace("user001").Do().Get()
+	// pod := obj.(*v1.Pod)
+	// glog.V(4).Infof("Pod: %s, status: %v, namespace: %s", pod.Name, podStatus(pod), pod.Namespace)
+
+	p, err := c.client.CoreV1().RESTClient().Get().Resource("thirdpartyresources").Do().Get()
+	// p, err := c.client.CoreV1().RESTClient().Get().Resource("thirdpartyresources").Namespace("user001").Do().Get()
 	fmt.Println("###%v,%v", p, err)
 }
 
