@@ -63,7 +63,7 @@ func prepareTPR(client kubernetes.Interface) {
 					Versions: []v1beta1.APIVersion{
 						{Name: TPRVersion},
 					},
-					Description: TPRDesc[name],
+					Description: TPRDesc[kind],
 				}
 
 				result, err := client.Extensions().ThirdPartyResources().Create(tpr)
