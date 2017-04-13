@@ -48,8 +48,9 @@ func tprName(kind string) string {
 }
 
 type ServiceBrokerSpec struct {
-	Foo string `json:"foo"`
-	Bar bool   `json:"bar"`
+	URL      string `json:"url"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 type ServiceBroker struct {

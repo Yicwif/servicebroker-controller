@@ -195,7 +195,7 @@ func (c *rebootController) handler(obj interface{}) {
 	if err != nil {
 		glog.Error(err)
 	} else {
-		glog.V(4).Info(sblist)
+		glog.V(4).Infof("#####%v", sblist)
 	}
 	func() {
 		var example ServiceBroker
@@ -203,7 +203,7 @@ func (c *rebootController) handler(obj interface{}) {
 		err = c.tprclient.Get().
 			Resource("servicebrokers").
 			Namespace(api.NamespaceDefault).
-			Name("example1").
+			Name("test").
 			Do().Into(&example)
 
 		if err != nil {
@@ -211,11 +211,12 @@ func (c *rebootController) handler(obj interface{}) {
 				// Create an instance of our TPR
 				example := &ServiceBroker{
 					Metadata: api.ObjectMeta{
-						Name: "example1",
+						Name: "test",
 					},
 					Spec: ServiceBrokerSpec{
-						Foo: "hello",
-						Bar: true,
+						URL:      "http://localhost",
+						Username: "test",
+						Password: "test",
 					},
 				}
 
