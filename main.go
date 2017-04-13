@@ -9,11 +9,14 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/errors"
+	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/serializer"
 	"k8s.io/client-go/pkg/util/wait"
 	"k8s.io/client-go/pkg/watch"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -43,8 +46,18 @@ func main() {
 
 	prepareTPR(client)
 
+	// make a new config for our extension's API group, using the first config as a baseline
+	var tprconfig *rest.Config
+	tprconfig = config
+	configureClient(tprconfig)
+
+	tprclient, err := rest.RESTClientFor(tprconfig)
+	if err != nil {
+		panic(err)
+	}
+
 	glog.Infof("Starting Servicebroker controller, version: %v", Version)
-	go newRebootController(client).controller.Run(wait.NeverStop)
+	go newRebootController(client, tprclient).controller.Run(wait.NeverStop)
 	select {}
 }
 
@@ -79,15 +92,42 @@ func prepareTPR(client kubernetes.Interface) {
 	}
 }
 
+func configureClient(config *rest.Config) {
+	groupversion := unversioned.GroupVersion{
+		Group:   TPRGroup,
+		Version: TPRVersion,
+	}
+
+	config.GroupVersion = &groupversion
+	config.APIPath = "/apis"
+	config.ContentType = runtime.ContentTypeJSON
+	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+
+	schemeBuilder := runtime.NewSchemeBuilder(
+		func(scheme *runtime.Scheme) error {
+			scheme.AddKnownTypes(
+				groupversion,
+				&ServiceBroker{},
+				&ServiceBrokerList{},
+				&api.ListOptions{},
+				&api.DeleteOptions{},
+			)
+			return nil
+		})
+	schemeBuilder.AddToScheme(api.Scheme)
+}
+
 type rebootController struct {
 	client     kubernetes.Interface
+	tprclient  *rest.RESTClient
 	nodeLister storeToNodeLister
 	controller cache.ControllerInterface
 }
 
-func newRebootController(client kubernetes.Interface) *rebootController {
+func newRebootController(client kubernetes.Interface, tprclient *rest.RESTClient) *rebootController {
 	rc := &rebootController{
-		client: client,
+		client:    client,
+		tprclient: tprclient,
 	}
 
 	store, controller := cache.NewInformer(
@@ -149,7 +189,14 @@ func (c *rebootController) handler(obj interface{}) {
 	// glog.V(4).Infof("Pod: %s, status: %v, namespace: %s", pod.Name, podStatus(pod), pod.Namespace)
 
 	tpr := obj.(*v1beta1.ThirdPartyResource)
-	glog.V(4).Infof("TPR: %s, data: %v", tpr.Name, tpr)
+	glog.V(4).Infof("TPR: %s, version: %v, desc: %v", tpr.Name, tpr.Versions, tpr.Description)
+	sblist := new(ServiceBrokerList)
+	err := c.tprclient.Get().Resource("ServiceBrokers").Do().Into(sblist)
+	if err != nil {
+		glog.Error(err)
+	} else {
+		glog.V(4).Info(sblist)
+	}
 	// p, err := c.client.CoreV1().RESTClient().Get().Resource("thirdpartyresources").Do().Get()
 	// p, err := c.client.CoreV1().RESTClient().Get().Resource("thirdpartyresources").Namespace("user001").Do().Get()
 	// fmt.Println("###%v,%v", p, err)
