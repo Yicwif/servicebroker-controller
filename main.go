@@ -197,6 +197,48 @@ func (c *rebootController) handler(obj interface{}) {
 	} else {
 		glog.V(4).Info(sblist)
 	}
+	func() {
+		var example ServiceBroker
+
+		err = c.tprclient.Get().
+			Resource("examples").
+			Namespace(api.NamespaceDefault).
+			Name("example1").
+			Do().Into(&example)
+
+		if err != nil {
+			if errors.IsNotFound(err) {
+				// Create an instance of our TPR
+				example := &ServiceBroker{
+					Metadata: api.ObjectMeta{
+						Name: "example1",
+					},
+					Spec: ServiceBrokerSpec{
+						Foo: "hello",
+						Bar: true,
+					},
+				}
+
+				var result ServiceBroker
+				err = c.tprclient.Post().
+					Resource("examples").
+					Namespace(api.NamespaceDefault).
+					Body(example).
+					Do().Into(&result)
+
+				if err != nil {
+					panic(err)
+				}
+				fmt.Printf("CREATED: %#v\n", result)
+			} else {
+				panic(err)
+			}
+		} else {
+			fmt.Printf("GET: %#v\n", example)
+		}
+
+	}()
+
 	// p, err := c.client.CoreV1().RESTClient().Get().Resource("thirdpartyresources").Do().Get()
 	// p, err := c.client.CoreV1().RESTClient().Get().Resource("thirdpartyresources").Namespace("user001").Do().Get()
 	// fmt.Println("###%v,%v", p, err)
