@@ -19,10 +19,33 @@ package main
 import (
 	"encoding/json"
 
+	"fmt"
+
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/meta"
 	"k8s.io/client-go/pkg/api/unversioned"
 )
+
+const (
+	TPRServiceBroker   = "service-broker"
+	TPRBackingService  = "backing-service"
+	TPRServiceInstance = "service-instance"
+	TPRGroup           = "datafoundry.io"
+	TPRVersion         = "v1"
+)
+
+var (
+	TPRKinds = []string{TPRServiceBroker, TPRBackingService, TPRServiceInstance}
+	TPRDesc  = map[string]string{
+		TPRServiceBroker:   "ServiceBroker agent on DataFoundry",
+		TPRBackingService:  "Service catalog from a ServiceBroker",
+		TPRServiceInstance: "BackingService instance",
+	}
+)
+
+func tprName(kind string) string {
+	return fmt.Sprintf("%s.%s", kind, TPRGroup)
+}
 
 type ServiceBrokerSpec struct {
 	Foo string `json:"foo"`

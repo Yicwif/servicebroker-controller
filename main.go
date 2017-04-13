@@ -50,29 +50,33 @@ func main() {
 
 func prepareTPR(client kubernetes.Interface) {
 	glog.V(4).Info("prepare TPR.")
-	result, err := client.Extensions().ThirdPartyResources().Get("service-broker.datafoundry.io")
-	if err != nil {
-		if errors.IsNotFound(err) {
-			tpr := &v1beta1.ThirdPartyResource{
-				ObjectMeta: v1.ObjectMeta{
-					Name: "service-broker.datafoundry.io",
-				},
-				Versions: []v1beta1.APIVersion{
-					{Name: "v1"},
-				},
-				Description: "Service Broket agent on DataFoundry.",
-			}
 
-			result, err := client.Extensions().ThirdPartyResources().Create(tpr)
-			if err != nil {
+	for _, kind := range TPRKinds {
+		name := tprName(kind)
+		result, err := client.Extensions().ThirdPartyResources().Get(name)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				tpr := &v1beta1.ThirdPartyResource{
+					ObjectMeta: v1.ObjectMeta{
+						Name: name,
+					},
+					Versions: []v1beta1.APIVersion{
+						{Name: TPRVersion},
+					},
+					Description: TPRDesc[name],
+				}
+
+				result, err := client.Extensions().ThirdPartyResources().Create(tpr)
+				if err != nil {
+					panic(err)
+				}
+				fmt.Printf("CREATED: %#v\nFROM: %#v\n", result, tpr)
+			} else {
 				panic(err)
 			}
-			fmt.Printf("CREATED: %#v\nFROM: %#v\n", result, tpr)
-		} else {
-			panic(err)
 		}
+		fmt.Printf("SKIPPING: already exists %#v\n", result)
 	}
-	fmt.Printf("SKIPPING: already exists %#v\n", result)
 }
 
 type rebootController struct {
