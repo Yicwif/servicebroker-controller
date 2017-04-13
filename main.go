@@ -190,8 +190,8 @@ func (c *rebootController) handler(obj interface{}) {
 
 	tpr := obj.(*v1beta1.ThirdPartyResource)
 	glog.V(4).Infof("TPR: %s, version: %v, desc: %v", tpr.Name, tpr.Versions, tpr.Description)
-	sblist := new(ServiceBrokerList)
-	err := c.tprclient.Get().Resource("servicebrokers").Namespace(api.NamespaceDefault).Do().Into(sblist)
+	sblist := ServiceBrokerList{}
+	err := c.tprclient.Get().Resource("servicebrokers").Namespace(api.NamespaceDefault).Do().Into(&sblist)
 	if err != nil {
 		glog.Error(err)
 	} else {
