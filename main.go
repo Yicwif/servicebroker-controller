@@ -8,6 +8,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/pkg/runtime"
@@ -40,8 +41,38 @@ func main() {
 		glog.Fatalf("Failed to create kubernetes client: %v", err)
 	}
 
+	prepareTPR(client)
+
 	glog.Infof("Starting Servicebroker controller, version: %v", Version)
-	newRebootController(client).controller.Run(wait.NeverStop)
+	go newRebootController(client).controller.Run(wait.NeverStop)
+	select {}
+}
+
+func prepareTPR(client kubernetes.Interface) {
+	glog.V(4).Info("prepare TPR.")
+	result, err := client.Extensions().ThirdPartyResources().Get("service-broker.datafoundry.io")
+	if err != nil {
+		if errors.IsNotFound(err) {
+			tpr := &v1beta1.ThirdPartyResource{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "service-broker.datafoundry.io",
+				},
+				Versions: []v1beta1.APIVersion{
+					{Name: "v1"},
+				},
+				Description: "Service Broket agent on DataFoundry.",
+			}
+
+			result, err := client.Extensions().ThirdPartyResources().Create(tpr)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Printf("CREATED: %#v\nFROM: %#v\n", result, tpr)
+		} else {
+			panic(err)
+		}
+	}
+	fmt.Printf("SKIPPING: already exists %#v\n", result)
 }
 
 type rebootController struct {
