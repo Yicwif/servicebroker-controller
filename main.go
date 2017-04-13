@@ -201,7 +201,7 @@ func (c *rebootController) handler(obj interface{}) {
 		var example ServiceBroker
 
 		err = c.tprclient.Get().
-			Resource("examples").
+			Resource("servicebrokers").
 			Namespace(api.NamespaceDefault).
 			Name("example1").
 			Do().Into(&example)
@@ -221,7 +221,7 @@ func (c *rebootController) handler(obj interface{}) {
 
 				var result ServiceBroker
 				err = c.tprclient.Post().
-					Resource("examples").
+					Resource("servicebrokers").
 					Namespace(api.NamespaceDefault).
 					Body(example).
 					Do().Into(&result)
