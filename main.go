@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/client-go/kubernetes"
@@ -15,7 +14,6 @@ import (
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/serializer"
 	"k8s.io/client-go/pkg/util/wait"
-	"k8s.io/client-go/pkg/watch"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -57,7 +55,7 @@ func main() {
 	}
 
 	glog.Infof("Starting Servicebroker controller, version: %v", Version)
-	go newRebootController(client, tprclient).controller.Run(wait.NeverStop)
+	go serviceBrokerController(client, tprclient).controller.Run(wait.NeverStop)
 	select {}
 }
 
@@ -115,134 +113,6 @@ func configureClient(config *rest.Config) {
 			return nil
 		})
 	schemeBuilder.AddToScheme(api.Scheme)
-}
-
-type rebootController struct {
-	client     kubernetes.Interface
-	tprclient  *rest.RESTClient
-	nodeLister storeToNodeLister
-	controller cache.ControllerInterface
-}
-
-func newRebootController(client kubernetes.Interface, tprclient *rest.RESTClient) *rebootController {
-	rc := &rebootController{
-		client:    client,
-		tprclient: tprclient,
-	}
-
-	store, controller := cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(alo api.ListOptions) (runtime.Object, error) {
-				var lo v1.ListOptions
-				v1.Convert_api_ListOptions_To_v1_ListOptions(&alo, &lo, nil)
-
-				// We do not add any selectors because we want to watch all nodes.
-				// This is so we can determine the total count of "unavailable" nodes.
-				// However, this could also be implemented using multiple informers (or better, shared-informers)
-				// return client.Core().Pods().List(lo)
-
-				// return client.Core().Pods("").List(lo)
-
-				// return client.CoreV1().RESTClient().Get().Resource("thirdpartyresources").Do().Get()
-				return client.Extensions().ThirdPartyResources().List(lo)
-
-			},
-			WatchFunc: func(alo api.ListOptions) (watch.Interface, error) {
-				var lo v1.ListOptions
-				v1.Convert_api_ListOptions_To_v1_ListOptions(&alo, &lo, nil)
-				// return client.Core().Pods("").Watch(lo)
-				// return client.CoreV1().RESTClient().Get().Resource("thirdpartyresources").Watch()
-				return client.Extensions().ThirdPartyResources().Watch(lo)
-			},
-		},
-		// The types of objects this informer will return
-		// &v1.Pod{},
-		&v1beta1.ThirdPartyResource{},
-		// The resync period of this object. This will force a re-queue of all cached objects at this interval.
-		// Every object will trigger the `Updatefunc` even if there have been no actual updates triggered.
-		// In some cases you can set this to a very high interval - as you can assume you will see periodic updates in normal operation.
-		// The interval is set low here for demo purposes.
-		10*time.Second,
-		// Callback Functions to trigger on add/update/delete
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    rc.handler,
-			UpdateFunc: func(old, new interface{}) { rc.handler(new) },
-			DeleteFunc: rc.handler,
-		},
-	)
-
-	rc.controller = controller
-	// Convert the cache.Store to a nodeLister to avoid some boilerplate (e.g. convert runtime.Objects to *v1.Nodes)
-	// TODO(aaron): use upstream cache.StoreToNodeLister once v3.0.0 client-go available
-	rc.nodeLister = storeToNodeLister{store}
-
-	return rc
-}
-
-func (c *rebootController) handler(obj interface{}) {
-	// TODO(aaron): This would be better handled using a workqueue. This will be added to client-go during v1.6.x release.
-	//   As we process objects, add to queue for processing, rather than potentially rebooting whichver node checked in last.
-	//   A good example of this pattern is shown in: https://github.com/kubernetes/community/blob/master/contributors/devel/controllers.md
-	//   We could also protect against operating against a partial cache by not starting processing until cached synced.
-
-	// pod := obj.(*v1.Pod)
-	// glog.V(4).Infof("Pod: %s, status: %v, namespace: %s", pod.Name, podStatus(pod), pod.Namespace)
-
-	tpr := obj.(*v1beta1.ThirdPartyResource)
-	glog.V(4).Infof("TPR: %s, version: %v, desc: %v", tpr.Name, tpr.Versions, tpr.Description)
-	sblist := ServiceBrokerList{}
-	err := c.tprclient.Get().Resource("servicebrokers").Namespace(api.NamespaceDefault).Do().Into(&sblist)
-	if err != nil {
-		glog.Error(err)
-	} else {
-		glog.V(4).Infof("#####%v", sblist)
-	}
-	func() {
-		var example ServiceBroker
-
-		err = c.tprclient.Get().
-			Resource("servicebrokers").
-			Namespace(api.NamespaceDefault).
-			Name("test").
-			Do().Into(&example)
-
-		if err != nil {
-			if errors.IsNotFound(err) {
-				// Create an instance of our TPR
-				example := &ServiceBroker{
-					Metadata: api.ObjectMeta{
-						Name: "test",
-					},
-					Spec: ServiceBrokerSpec{
-						URL:      "http://localhost",
-						Username: "test",
-						Password: "test",
-					},
-				}
-
-				var result ServiceBroker
-				err = c.tprclient.Post().
-					Resource("servicebrokers").
-					Namespace(api.NamespaceDefault).
-					Body(example).
-					Do().Into(&result)
-
-				if err != nil {
-					panic(err)
-				}
-				fmt.Printf("CREATED: %#v\n", result)
-			} else {
-				panic(err)
-			}
-		} else {
-			fmt.Printf("GET: %#v\n", example)
-		}
-
-	}()
-
-	// p, err := c.client.CoreV1().RESTClient().Get().Resource("thirdpartyresources").Do().Get()
-	// p, err := c.client.CoreV1().RESTClient().Get().Resource("thirdpartyresources").Namespace("user001").Do().Get()
-	// fmt.Println("###%v,%v", p, err)
 }
 
 func podStatus(pod *v1.Pod) string {
