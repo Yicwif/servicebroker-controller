@@ -54,8 +54,10 @@ func main() {
 		panic(err)
 	}
 
-	glog.Infof("Starting Servicebroker controller, version: %v", Version)
+	glog.Infof("Starting ServiceBroker controller, version: %v", Version)
 	go serviceBrokerController(client, tprclient).controller.Run(wait.NeverStop)
+	glog.Infof("Starting ServiceInstance controller, version: %v", Version)
+	go serviceInstanceController(client, tprclient).controller.Run(wait.NeverStop)
 	select {}
 }
 
@@ -72,7 +74,7 @@ func prepareTPR(client kubernetes.Interface) {
 						Name: name,
 					},
 					Versions: []v1beta1.APIVersion{
-						{Name: TPRVersion},
+						{Name: TPR_VERSION},
 					},
 					Description: TPRDesc[kind],
 				}
@@ -92,8 +94,8 @@ func prepareTPR(client kubernetes.Interface) {
 
 func configureClient(config *rest.Config) {
 	groupversion := unversioned.GroupVersion{
-		Group:   TPRGroup,
-		Version: TPRVersion,
+		Group:   TPR_GROUP,
+		Version: TPR_VERSION,
 	}
 
 	config.GroupVersion = &groupversion
@@ -107,6 +109,8 @@ func configureClient(config *rest.Config) {
 				groupversion,
 				&ServiceBroker{},
 				&ServiceBrokerList{},
+				&ServiceInstance{},
+				&ServiceInstanceList{},
 				&api.ListOptions{},
 				&api.DeleteOptions{},
 			)

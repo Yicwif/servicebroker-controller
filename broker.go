@@ -23,7 +23,7 @@ func serviceBrokerController(client kubernetes.Interface, tprclient *rest.RESTCl
 		tprclient: tprclient,
 	}
 
-	brokerlistwatcher := cache.NewListWatchFromClient(tprclient, "servicebrokers", api.NamespaceDefault, nil)
+	brokerlistwatcher := cache.NewListWatchFromClient(tprclient, SERVICE_BROKERS, api.NamespaceDefault, nil)
 
 	store, controller := cache.NewInformer(
 		brokerlistwatcher,
@@ -34,7 +34,7 @@ func serviceBrokerController(client kubernetes.Interface, tprclient *rest.RESTCl
 		// Every object will trigger the `Updatefunc` even if there have been no actual updates triggered.
 		// In some cases you can set this to a very high interval - as you can assume you will see periodic updates in normal operation.
 		// The interval is set low here for demo purposes.
-		30*time.Second,
+		300*time.Second,
 		// Callback Functions to trigger on add/update/delete
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    broker.addHandler,
@@ -45,7 +45,7 @@ func serviceBrokerController(client kubernetes.Interface, tprclient *rest.RESTCl
 
 	broker.controller = controller
 	// Convert the cache.Store to a nodeLister to avoid some boilerplate (e.g. convert runtime.Objects to *v1.Nodes)
-	// TODO(aaron): use upstream cache.StoreToNodeLister once v3.0.0 client-go available
+	// TODO: use upstream cache.StoreToNodeLister once v3.0.0 client-go available
 	broker.nodeLister = storeToNodeLister{store}
 
 	return broker
